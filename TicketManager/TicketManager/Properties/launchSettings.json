@@ -1,0 +1,10 @@
+{
+  "profiles": {
+    "TicketManager (Package)": {
+      "commandName": "MsixPackage"
+    },
+    "TicketManager (Unpackaged)": {
+      "commandName": "Project"
+    }
+  }
+}
