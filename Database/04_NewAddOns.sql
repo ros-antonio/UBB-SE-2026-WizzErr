@@ -7,6 +7,6 @@ CREATE TABLE Tickets_AddOns (
 CREATE TABLE Memberships_AddOns_Discounts (
     membership_id INT NOT NULL FOREIGN KEY REFERENCES Memberships(membership_id),
     addon_id INT NOT NULL FOREIGN KEY REFERENCES AddOns(addon_id),
-    discount_percentage DECIMAL(5, 2) NOT NULL DEFAULT 0,
+    discount_percentage TINYINT NOT NULL DEFAULT 0 CHECK (discount_percentage <= 100),
     PRIMARY KEY (membership_id, addon_id)
 );
