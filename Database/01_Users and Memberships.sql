@@ -1,7 +1,7 @@
 CREATE TABLE Memberships (
     membership_id INT PRIMARY KEY IDENTITY(1,1),
     name NVARCHAR(50) NOT NULL,
-    flight_discount_percentage DECIMAL(5, 2) NOT NULL DEFAULT 0
+    flight_discount_percentage TINYINT NOT NULL DEFAULT 0 CHECK (flight_discount_percentage <= 100)
 );
 
 CREATE TABLE Users (
