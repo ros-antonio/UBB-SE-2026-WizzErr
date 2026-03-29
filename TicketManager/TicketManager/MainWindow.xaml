@@ -13,7 +13,32 @@
         <MicaBackdrop />
     </Window.SystemBackdrop>
 
-    <Grid>
+    <Grid Background="Transparent">
+		
+		<NavigationView x:Name="TopNav"
+						PaneDisplayMode="Top"
+                        IsBackButtonVisible="Visible"
+                        ItemInvoked="TopNav_ItemInvoked"
+                        BackRequested="TopNav_BackRequested">
+			
+			<NavigationView.Resources>
+                <SolidColorBrush x:Key="NavigationViewItemForegroundSelected" Color="2bb8c0" />
+				<SolidColorBrush x:Key="NavigationViewItemForegroundSelectedPointerOver" Color="#2bb8c0" />
+				<SolidColorBrush x:Key="NavigationViewItemForegroundSelectedPressed" Color="#1c8a91" />
+				<SolidColorBrush x:Key="NavigationViewSelectionIndicatorForeground" Color="#2bb8c0" />
+			</NavigationView.Resources>
+
+			<NavigationView.MenuItems>
+				<NavigationViewItem Content="Search" Tag="TicketManager.view.SearchPage" Foreground="Black" />
+				<NavigationViewItem Content="Memberships" Tag="TicketManager.view.MembershipsPage" Foreground="Black" />
+				<NavigationViewItem Content="Services" Tag="TicketManager.view.ServicesPage" Foreground="Black" />
+				<NavigationViewItem Content="Support" Tag="TicketManager.view.SupportPage" Foreground="Black" />
+				<NavigationViewItem Content="My Bookings" Tag="TicketManager.view.MyBookingsPage" Foreground="Black" />
+			</NavigationView.MenuItems>
+
+			<Frame x:Name="ContentFrame" />
+
+		</NavigationView>
 
     </Grid>
 </Window>
