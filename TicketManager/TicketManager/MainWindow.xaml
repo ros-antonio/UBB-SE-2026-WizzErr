@@ -13,27 +13,27 @@
         <MicaBackdrop />
     </Window.SystemBackdrop>
 
-    <Grid Background="Transparent">
-		
+	<Grid Background="Transparent" RequestedTheme="Light">
+
 		<NavigationView x:Name="TopNav"
 						PaneDisplayMode="Top"
-                        IsBackButtonVisible="Visible"
-                        ItemInvoked="TopNav_ItemInvoked"
-                        BackRequested="TopNav_BackRequested">
-			
+						IsBackButtonVisible="Visible"
+						ItemInvoked="TopNav_ItemInvoked"
+						BackRequested="TopNav_BackRequested">
+
 			<NavigationView.Resources>
-                <SolidColorBrush x:Key="NavigationViewItemForegroundSelected" Color="2bb8c0" />
+				<SolidColorBrush x:Key="NavigationViewItemForegroundSelected" Color="#2bb8c0" />
 				<SolidColorBrush x:Key="NavigationViewItemForegroundSelectedPointerOver" Color="#2bb8c0" />
-				<SolidColorBrush x:Key="NavigationViewItemForegroundSelectedPressed" Color="#1c8a91" />
+				<SolidColorBrush x:Key="NavigationViewItemForegroundSelectedPressed" Color="#2bb8c0" />
 				<SolidColorBrush x:Key="NavigationViewSelectionIndicatorForeground" Color="#2bb8c0" />
 			</NavigationView.Resources>
 
 			<NavigationView.MenuItems>
-				<NavigationViewItem Content="Search" Tag="TicketManager.view.SearchPage" Foreground="Black" />
-				<NavigationViewItem Content="Memberships" Tag="TicketManager.view.MembershipsPage" Foreground="Black" />
-				<NavigationViewItem Content="Services" Tag="TicketManager.view.ServicesPage" Foreground="Black" />
-				<NavigationViewItem Content="Support" Tag="TicketManager.view.SupportPage" Foreground="Black" />
-				<NavigationViewItem Content="My Bookings" Tag="TicketManager.view.MyBookingsPage" Foreground="Black" />
+				<NavigationViewItem Content="Search" Tag="TicketManager.View.FlightSearchPage" />
+				<NavigationViewItem Content="Dashboard" Tag="TicketManager.View.DashboardPage" />
+				<NavigationViewItem Content="Memberships" Tag="TicketManager.View.MembershipsPage" />
+				<NavigationViewItem Content="Services" Tag="TicketManager.View.ServicesPage" />
+				<NavigationViewItem Content="Support" Tag="TicketManager.View.SupportPage" />
 			</NavigationView.MenuItems>
 
 			<Frame x:Name="ContentFrame" />

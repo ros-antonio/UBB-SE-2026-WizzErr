@@ -24,7 +24,7 @@ namespace TicketManager
             // 1. Abonăm Frame-ul la evenimentul de navigare
             ContentFrame.Navigated += ContentFrame_Navigated;
 
-            NavigateTo(typeof(View.LoginPage));
+            NavigateToAuth();
             TopNav.SelectedItem = null;
         }
 
@@ -36,6 +36,26 @@ namespace TicketManager
             }
         }
 
+        public void NavigateToAuth()
+        {
+            NavigateTo(typeof(View.AuthPage));
+        }
+
+        public void NavigateToSearch()
+        {
+            NavigateTo(typeof(View.FlightSearchPage));
+        }
+
+        public void NavigateToDashboard()
+        {
+            // NavigateTo(typeof(View.DashboardPage));
+        }
+
+        public void NavigateToMemberships()
+        {
+            // NavigateTo(typeof(View.MembershipsPage));
+        }
+
         // 2. Funcția care pune liniuța pe butonul corect automat
         private void ContentFrame_Navigated(object sender, NavigationEventArgs e)
         {
@@ -43,7 +63,7 @@ namespace TicketManager
 
             bool itemFound = false;
 
-            // Luăm doar numele paginii (ex: "SearchPage" în loc de "TicketManager.view.SearchPage")
+            // Luăm doar numele paginii (ex: "FlightSearchPage" în loc de "TicketManager.view.FlightSearchPage")
             string pageName = e.SourcePageType.Name;
 
             foreach (NavigationViewItem item in TopNav.MenuItems)
@@ -59,7 +79,7 @@ namespace TicketManager
             }
 
             // Dacă suntem la Login sau Register, scoatem selecția de pe meniu
-            if (!itemFound)
+            if (!itemFound || pageName == "AuthPage")
             {
                 TopNav.SelectedItem = null;
             }
