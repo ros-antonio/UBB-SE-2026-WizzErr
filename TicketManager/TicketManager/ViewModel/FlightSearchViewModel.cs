@@ -56,7 +56,7 @@ namespace TicketManager.ViewModel
             AvailableFlights = new ObservableCollection<FlightDisplayModel>();
 
             // Legăm butonul de metoda ExecuteSearch
-            SearchCommand = new RelayCommand(ExecuteSearch);
+            SearchCommand = new RelayCommand(_ => ExecuteSearch());
         }
 
         private void ExecuteSearch()
