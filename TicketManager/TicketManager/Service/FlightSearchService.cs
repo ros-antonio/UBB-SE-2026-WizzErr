@@ -18,14 +18,8 @@ namespace TicketManager.Service
             _flightRepository = flightRepository ?? throw new ArgumentNullException(nameof(flightRepository));
         }
 
-        public IEnumerable<Flight> SearchFlights(string location, string flightType, DateTime date)
+        public IEnumerable<Flight> SearchFlights(string location, string flightType, DateTime? date)
         {
-            // Validări de bază (Business Logic)
-            if (string.IsNullOrWhiteSpace(location))
-            {
-                return new List<Flight>();
-            }
-
             // Dacă datele sunt ok, apelăm interogarea SQL deja scrisă în Repository
             return _flightRepository.GetFlightsByRoute(location, flightType, date);
         }

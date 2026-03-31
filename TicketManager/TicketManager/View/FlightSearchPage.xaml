@@ -31,9 +31,15 @@
                     </StackPanel>
                 </StackPanel>
 
-                <CalendarDatePicker x:Name="datePicker" Header="Date" PlaceholderText="Select date" Width="150" 
-                                    Date="{x:Bind ViewModel.FlightDate, Mode=TwoWay}" 
-                                    CalendarViewDayItemChanging="DatePicker_CalendarViewDayItemChanging" />
+                <StackPanel Orientation="Horizontal" Spacing="4" VerticalAlignment="Bottom">
+                    <CalendarDatePicker x:Name="datePicker" Header="Date" PlaceholderText="Select date" Width="150" 
+                                        Date="{x:Bind ViewModel.FlightDate, Mode=TwoWay}" 
+                                        CalendarViewDayItemChanging="DatePicker_CalendarViewDayItemChanging" />
+
+                    <Button Content="✕" Background="Transparent" Foreground="Gray" BorderThickness="0" 
+                            VerticalAlignment="Bottom" Height="32" ToolTipService.ToolTip="Clear Date"
+                            Click="ClearDate_Click"/>
+                </StackPanel>
 
                 <TextBox x:Name="passengersInput" Header="Passengers" PlaceholderText="Nr" Width="80" 
                          Text="{x:Bind ViewModel.Passengers, Mode=TwoWay}" 

@@ -49,16 +49,14 @@ namespace TicketManager.Repository
             return flight;
         }
 
-        public IEnumerable<Flight> GetFlightsByRoute(string location, string routeType, DateTime date)
+        public IEnumerable<Flight> GetFlightsByRoute(string location, string routeType, DateTime? date)
         {
             var flights = new List<Flight>();
             using (var connection = _dbFactory.GetConnection())
             {
                 connection.Open();
-                // Basic implementation for flight searching based on Airport city/code matching.
-                // In a Central Hub system, flights either depart from the hub to the location (DEP)
-                // or arrive at the hub from the location (ARR).
 
+                // Construim query-ul dinamic. Punem WHERE 1=1 ca să putem adăuga filtre cu AND.
                 string query = @"
                     SELECT f.id as flight_id, f.date, f.flight_number,
                            r.id as route_id, r.route_type, r.departure_time, r.arrival_time, r.capacity,
@@ -70,15 +68,37 @@ namespace TicketManager.Repository
                     INNER JOIN Airports a ON r.airport_id = a.id
                     INNER JOIN Companies c ON r.company_id = c.id
                     LEFT JOIN Gates g ON f.gate_id = g.id
-                    WHERE CAST(f.date AS DATE) = CAST(@Date AS DATE)
-                      AND r.route_type = @RouteType
-                      AND (a.city = @Location OR a.code = @Location)";
+                    WHERE 1=1";
+
+                // Adăugăm filtrul de locație doar dacă utilizatorul a scris ceva
+                if (!string.IsNullOrWhiteSpace(location))
+                {
+                    query += " AND (a.city = @Location OR a.code = @Location)";
+                }
+
+                // Adăugăm filtrul de rută (DEP/ARR)
+                if (!string.IsNullOrWhiteSpace(routeType))
+                {
+                    query += " AND r.route_type = @RouteType";
+                }
+
+                // Adăugăm filtrul de dată doar dacă utilizatorul a selectat o dată
+                if (date.HasValue)
+                {
+                    query += " AND CAST(f.date AS DATE) = CAST(@Date AS DATE)";
+                }
 
                 using (var command = new SqlCommand(query, connection))
                 {
-                    command.Parameters.AddWithValue("@Location", location);
-                    command.Parameters.AddWithValue("@RouteType", routeType);
-                    command.Parameters.AddWithValue("@Date", date);
+                    // Atașăm parametrii doar dacă au fost folosiți în query
+                    if (!string.IsNullOrWhiteSpace(location))
+                        command.Parameters.AddWithValue("@Location", location);
+
+                    if (!string.IsNullOrWhiteSpace(routeType))
+                        command.Parameters.AddWithValue("@RouteType", routeType);
+
+                    if (date.HasValue)
+                        command.Parameters.AddWithValue("@Date", date.Value);
 
                     using (var reader = command.ExecuteReader())
                     {

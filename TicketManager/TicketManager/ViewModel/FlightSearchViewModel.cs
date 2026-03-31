@@ -63,21 +63,17 @@ namespace TicketManager.ViewModel
         {
             // Curățăm rezultatele vechi
             AvailableFlights.Clear();
-
-            // Validări minime
-            if (string.IsNullOrWhiteSpace(Location) || FlightDate == null)
-                return;
-
-            // Conform comentariilor din FlightRepository, tipul rutei este "DEP" sau "ARR"
+            // Tipul rutei va fi mereu DEP sau ARR (pentru că avem RadioButtons)
             string routeType = IsDeparture ? "DEP" : "ARR";
-            DateTime date = FlightDate.Value.DateTime;
 
-            // Apelăm Serviciul creat la Task-ul 1
+            // Extragem data (poate fi null acum dacă nu s-a selectat nimic în Calendar)
+            DateTime? date = FlightDate?.DateTime;
+
+            // Apelăm Serviciul cu noile filtre flexibile
             var results = _searchService.SearchFlights(Location, routeType, date);
 
             foreach (var flight in results)
             {
-                // Împachetăm zborul brut în modelul de afișare (formatat)
                 AvailableFlights.Add(new FlightDisplayModel(flight));
             }
         }

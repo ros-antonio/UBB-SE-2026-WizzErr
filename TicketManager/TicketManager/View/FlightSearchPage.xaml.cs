@@ -56,6 +56,12 @@ namespace TicketManager.View
                 args.Item.IsBlackout = true;
             }
         }
+        private void ClearDate_Click(object sender, RoutedEventArgs e)
+        {
+            // Setăm data din ViewModel pe null. 
+            // Datorită Mode=TwoWay, UI-ul se va goli automat!
+            ViewModel.FlightDate = null;
+        }
 
         private void BookButton_Click(object sender, RoutedEventArgs e)
         {
