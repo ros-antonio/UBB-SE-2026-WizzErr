@@ -1,9 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using System;
 using TicketManager.Domain;
 using TicketManager.Repository;
 
@@ -41,7 +38,13 @@ namespace TicketManager.Service
             // Folosim clasa voastră existentă: UserSession
             if (UserSession.CurrentUser != null && UserSession.CurrentUser.UserId == userId)
             {
-                UserSession.CurrentUser.Membership = _membershipRepository.GetMembershipById(newMembershipId);
+                var membership = _membershipRepository.GetMembershipById(newMembershipId);
+                if (membership != null)
+                {
+                    membership.AddonDiscounts = _membershipRepository.GetAddonDiscounts(newMembershipId).ToList();
+                }
+
+                UserSession.CurrentUser.Membership = membership;
             }
         }
     }

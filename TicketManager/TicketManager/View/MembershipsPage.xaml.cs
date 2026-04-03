@@ -36,7 +36,7 @@ namespace TicketManager.View
             ViewModel = new MembershipViewModel(service);
         }
 
-        private void PurchaseButton_Click(object sender, RoutedEventArgs e)
+        private async void PurchaseButton_Click(object sender, RoutedEventArgs e)
         {
             // Dacă nu e logat, îl trimitem la Login
             if (UserSession.CurrentUser == null)
@@ -47,7 +47,32 @@ namespace TicketManager.View
 
             if (sender is Button btn && btn.Tag is int membershipId)
             {
-                ViewModel.ExecutePurchase(membershipId);
+                try
+                {
+                    ViewModel.ExecutePurchase(membershipId);
+
+                    var dialog = new ContentDialog
+                    {
+                        Title = "Membership updated",
+                        Content = "Your membership purchase was completed successfully.",
+                        CloseButtonText = "OK",
+                        XamlRoot = this.XamlRoot
+                    };
+
+                    await dialog.ShowAsync();
+                }
+                catch
+                {
+                    var dialog = new ContentDialog
+                    {
+                        Title = "Purchase failed",
+                        Content = "Membership purchase could not be completed. Please try again.",
+                        CloseButtonText = "OK",
+                        XamlRoot = this.XamlRoot
+                    };
+
+                    await dialog.ShowAsync();
+                }
             }
         }
     }
