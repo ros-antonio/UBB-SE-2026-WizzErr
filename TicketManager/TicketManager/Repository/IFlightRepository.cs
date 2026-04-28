@@ -6,7 +6,10 @@ namespace TicketManager.Repository
 {
     public interface IFlightRepository
     {
-        IEnumerable<Flight> GetFlightsByRoute(string location, string routeType, DateTime? date, int? passengers);
-        Flight GetFlightById(int id);
+        IEnumerable<Flight> GetFlightsByRoute(string location, string routeType, DateTime? date);
+
+        Flight? GetFlightById(int id);
+
+        int GetOccupiedSeatCount(int flightId);
     }
 }

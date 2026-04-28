@@ -1,30 +1,26 @@
+using System;
+using System.Linq;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
-using Microsoft.UI.Xaml.Controls.Primitives;
-using Microsoft.UI.Xaml.Data;
-using Microsoft.UI.Xaml.Input;
-using Microsoft.UI.Xaml.Media;
 using Microsoft.UI.Xaml.Navigation;
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
-using System.Runtime.InteropServices.WindowsRuntime;
+using TicketManager.Domain;
 using TicketManager.Service;
-using Windows.Foundation;
-using Windows.Foundation.Collections;
 
 namespace TicketManager
 {
     public sealed partial class MainWindow : Window
     {
         private const string AccountNavTag = "Account";
+        private readonly IAuthService authService;
 
         public MainWindow()
         {
             this.InitializeComponent();
 
-            // 1. Abonăm Frame-ul la evenimentul de navigare
+            authService = App.AuthService;
+
+            App.NavigationService.Initialize(ContentFrame);
+
             ContentFrame.Navigated += ContentFrame_Navigated;
 
             NavigateToSearch();
@@ -36,11 +32,11 @@ namespace TicketManager
         {
             bool isAuthenticated = UserSession.CurrentUser != null;
 
-            foreach (var item in TopNav.MenuItems.OfType<NavigationViewItem>())
+            foreach (var navigationMenuItem in TopNav.MenuItems.OfType<NavigationViewItem>())
             {
-                string tag = item.Tag?.ToString() ?? string.Empty;
+                string tag = navigationMenuItem.Tag?.ToString() ?? string.Empty;
                 bool isSearchItem = tag.EndsWith("FlightSearchPage", StringComparison.OrdinalIgnoreCase);
-                item.IsEnabled = isAuthenticated || isSearchItem;
+                navigationMenuItem.IsEnabled = isAuthenticated || isSearchItem;
             }
 
             if (AccountMenuItem != null)
@@ -69,85 +65,81 @@ namespace TicketManager
 
         public void NavigateToDashboard()
         {
-            // NavigateTo(typeof(View.DashboardPage));
         }
 
         public void NavigateToMemberships()
         {
-            // NavigateTo(typeof(View.MembershipsPage));
         }
 
-        // 2. Funcția care pune liniuța pe butonul corect automat
-        private void ContentFrame_Navigated(object sender, NavigationEventArgs e)
+        private void ContentFrame_Navigated(object sender, NavigationEventArgs eventArgs)
         {
-            if (TopNav == null || TopNav.MenuItems == null) return;
+            if (TopNav == null || TopNav.MenuItems == null)
+            {
+                return;
+            }
 
             UpdateNavigationAvailability();
 
             bool itemFound = false;
+            string pageName = eventArgs.SourcePageType.Name;
 
-            // Luăm doar numele paginii (ex: "FlightSearchPage" în loc de "TicketManager.view.FlightSearchPage")
-            string pageName = e.SourcePageType.Name;
-
-            foreach (NavigationViewItem item in TopNav.MenuItems)
+            foreach (NavigationViewItem navigationMenuItem in TopNav.MenuItems)
             {
-                // Acum verificăm doar dacă Tag-ul SE TERMINĂ cu numele paginii. 
-                // Așa ignorăm complet problemele cu litere mari/mici de la folderul "view".
-                if (item.Tag != null && item.Tag.ToString().EndsWith(pageName, StringComparison.OrdinalIgnoreCase))
+                if (navigationMenuItem.Tag?.ToString()?.EndsWith(pageName, StringComparison.OrdinalIgnoreCase) == true)
                 {
-                    TopNav.SelectedItem = item;
+                    TopNav.SelectedItem = navigationMenuItem;
                     itemFound = true;
                     break;
                 }
             }
 
-            // Dacă suntem la Login sau Register, scoatem selecția de pe meniu
             if (!itemFound || pageName == "AuthPage")
             {
                 TopNav.SelectedItem = null;
             }
         }
 
-        private async void TopNav_ItemInvoked(NavigationView sender, NavigationViewItemInvokedEventArgs args)
+        private async void TopNav_ItemInvoked(NavigationView sender, NavigationViewItemInvokedEventArgs eventArgs)
         {
             UpdateNavigationAvailability();
 
-            var navItemTag = args.InvokedItemContainer?.Tag?.ToString();
+            var navItemTag = eventArgs.InvokedItemContainer?.Tag?.ToString();
             if (navItemTag == AccountNavTag)
             {
-                if (UserSession.CurrentUser == null)
+                var currentUser = UserSession.CurrentUser;
+                if (currentUser == null)
                 {
                     NavigateToAuth();
                     return;
                 }
 
-                string membershipTier = string.IsNullOrWhiteSpace(UserSession.CurrentUser.Membership?.Name)
+                string membershipTier = string.IsNullOrWhiteSpace(currentUser.Membership?.Name)
                     ? "None"
-                    : UserSession.CurrentUser.Membership.Name;
+                    : currentUser.Membership.Name;
 
                 var dialog = new ContentDialog
                 {
                     Title = "Account",
-                    Content = $"Email: {UserSession.CurrentUser.Email}\nUsername: {UserSession.CurrentUser.Username}\nMembership tier: {membershipTier}",
+                    Content = $"Email: {currentUser.Email}\nUsername: {currentUser.Username}\nMembership tier: {membershipTier}",
                     PrimaryButtonText = "Sign out",
                     CloseButtonText = "Close",
                     XamlRoot = ContentFrame.XamlRoot
                 };
 
-                var result = await dialog.ShowAsync();
-                if (result == ContentDialogResult.Primary)
+                var dialogResult = await dialog.ShowAsync();
+                if (dialogResult == ContentDialogResult.Primary)
                 {
-                    UserSession.CurrentUser = null;
-                    UserSession.PendingBookingParameters = null;
+                    authService.Logout();
                     UpdateNavigationAvailability();
                     NavigateToSearch();
                 }
+
                 return;
             }
 
             if (!string.IsNullOrEmpty(navItemTag))
             {
-                Type pageType = Type.GetType(navItemTag);
+                Type? pageType = Type.GetType(navItemTag);
                 if (pageType != null)
                 {
                     if (pageType != typeof(View.FlightSearchPage) && UserSession.CurrentUser == null)
@@ -161,7 +153,7 @@ namespace TicketManager
             }
         }
 
-        private void TopNav_BackRequested(NavigationView sender, NavigationViewBackRequestedEventArgs args)
+        private void TopNav_BackRequested(NavigationView sender, NavigationViewBackRequestedEventArgs eventArgs)
         {
             if (ContentFrame.CanGoBack)
             {
@@ -170,3 +162,9 @@ namespace TicketManager
         }
     }
 }
+
+
+
+
+
+
