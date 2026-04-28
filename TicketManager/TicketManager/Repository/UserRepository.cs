@@ -7,19 +7,19 @@ namespace TicketManager.Repository
 {
     public class UserRepository : IUserRepository
     {
-        private readonly DatabaseConnectionFactory _dbFactory;
-        private readonly IMembershipRepository _membershipRepository;
+        private readonly IDatabaseConnectionFactory databaseConnectionFactory;
+        private readonly IMembershipRepository membershipRepository;
 
-        public UserRepository(DatabaseConnectionFactory dbFactory)
+        public UserRepository(IDatabaseConnectionFactory databaseConnectionFactory, IMembershipRepository membershipRepository)
         {
-            _dbFactory = dbFactory ?? throw new ArgumentNullException(nameof(dbFactory));
-            _membershipRepository = new MembershipRepository(dbFactory);
+            this.databaseConnectionFactory = databaseConnectionFactory ?? throw new ArgumentNullException(nameof(databaseConnectionFactory));
+            this.membershipRepository = membershipRepository ?? throw new ArgumentNullException(nameof(membershipRepository));
         }
 
-        public User GetById(int id)
+        public User? GetById(int id)
         {
-            User user = null;
-            using (var connection = _dbFactory.GetConnection())
+            User? user = null;
+            using (var connection = this.databaseConnectionFactory.GetConnection())
             {
                 connection.Open();
                 string query = @"
@@ -29,26 +29,26 @@ namespace TicketManager.Repository
                     LEFT JOIN Memberships m ON u.membership_id = m.membership_id
                     WHERE u.user_id = @UserId";
 
-                using (var command = new SqlCommand(query, connection))
+                using (var getUserByIdCommand = new SqlCommand(query, connection))
                 {
-                    command.Parameters.AddWithValue("@UserId", id);
-
-                    using (var reader = command.ExecuteReader())
+                    getUserByIdCommand.Parameters.AddWithValue("@UserId", id);
+                    using (var reader = getUserByIdCommand.ExecuteReader())
                     {
                         if (reader.Read())
                         {
-                            user = MapUser(reader);
+                            user = this.MapUser(reader);
                         }
                     }
                 }
             }
+
             return user;
         }
 
-        public User GetByEmail(string email)
+        public User? GetByEmail(string email)
         {
-            User user = null;
-            using (var connection = _dbFactory.GetConnection())
+            User? user = null;
+            using (var connection = this.databaseConnectionFactory.GetConnection())
             {
                 connection.Open();
                 string query = @"
@@ -58,79 +58,77 @@ namespace TicketManager.Repository
                     LEFT JOIN Memberships m ON u.membership_id = m.membership_id
                     WHERE u.email = @Email";
 
-                using (var command = new SqlCommand(query, connection))
+                using (var getUserByEmailCommand = new SqlCommand(query, connection))
                 {
-                    command.Parameters.AddWithValue("@Email", email);
-
-                    using (var reader = command.ExecuteReader())
+                    getUserByEmailCommand.Parameters.AddWithValue("@Email", email);
+                    using (var reader = getUserByEmailCommand.ExecuteReader())
                     {
                         if (reader.Read())
                         {
-                            user = MapUser(reader);
+                            user = this.MapUser(reader);
                         }
                     }
                 }
             }
+
             return user;
         }
 
         public void AddUser(User user)
         {
-            using (var connection = _dbFactory.GetConnection())
+            using (var connection = this.databaseConnectionFactory.GetConnection())
             {
                 connection.Open();
                 string query = @"
                     INSERT INTO Users (email, phone, username, password_hash, membership_id) 
                     VALUES (@Email, @Phone, @Username, @PasswordHash, @MembershipId)";
-                
-                using (var command = new SqlCommand(query, connection))
+
+                using (var insertUserCommand = new SqlCommand(query, connection))
                 {
-                    command.Parameters.AddWithValue("@Email", user.Email);
-                    command.Parameters.AddWithValue("@Phone", user.Phone ?? (object)DBNull.Value);
-                    command.Parameters.AddWithValue("@Username", user.Username);
-                    command.Parameters.AddWithValue("@PasswordHash", user.PasswordHash);
-                    command.Parameters.AddWithValue("@MembershipId", user.Membership?.MembershipId ?? (object)DBNull.Value);
-                    
-                    command.ExecuteNonQuery();
+                    insertUserCommand.Parameters.AddWithValue("@Email", user.Email);
+                    insertUserCommand.Parameters.AddWithValue("@Phone", user.Phone ?? (object)DBNull.Value);
+                    insertUserCommand.Parameters.AddWithValue("@Username", user.Username);
+                    insertUserCommand.Parameters.AddWithValue("@PasswordHash", user.PasswordHash);
+                    insertUserCommand.Parameters.AddWithValue("@MembershipId", user.Membership?.MembershipId ?? (object)DBNull.Value);
+                    insertUserCommand.ExecuteNonQuery();
                 }
             }
         }
 
         public void UpdateUserMembership(int userId, int newMembershipId)
         {
-            using (var connection = _dbFactory.GetConnection())
+            using (var connection = this.databaseConnectionFactory.GetConnection())
             {
                 connection.Open();
                 string query = @"
                     UPDATE Users 
                     SET membership_id = @MembershipId
                     WHERE user_id = @UserId";
-                
-                using (var command = new SqlCommand(query, connection))
+
+                using (var updateUserMembershipCommand = new SqlCommand(query, connection))
                 {
-                    command.Parameters.AddWithValue("@UserId", userId);
-                    command.Parameters.AddWithValue("@MembershipId", newMembershipId);
-                    
-                    command.ExecuteNonQuery();
+                    updateUserMembershipCommand.Parameters.AddWithValue("@UserId", userId);
+                    updateUserMembershipCommand.Parameters.AddWithValue("@MembershipId", newMembershipId);
+                    updateUserMembershipCommand.ExecuteNonQuery();
                 }
             }
         }
 
         private User MapUser(SqlDataReader reader)
         {
-            int membershipIdIndex = reader.GetOrdinal("membership_id");
-            Membership membership = null;
+            int membershipIdOrdinal = reader.GetOrdinal("membership_id");
+            Membership? membership = null;
 
-            if (!reader.IsDBNull(membershipIdIndex))
+            if (!reader.IsDBNull(membershipIdOrdinal))
             {
-                membership = new Membership 
-                { 
-                    MembershipId = reader.GetInt32(membershipIdIndex),
+                membership = new Membership
+                {
+                    MembershipId = reader.GetInt32(membershipIdOrdinal),
                     Name = reader.GetString(reader.GetOrdinal("membership_name")),
                     FlightDiscountPercentage = (float)reader.GetByte(reader.GetOrdinal("flight_discount_percentage"))
                 };
 
-                membership.AddonDiscounts = _membershipRepository.GetAddonDiscounts(membership.MembershipId).ToList();
+                membership.AddonDiscounts = this.membershipRepository.GetAddonDiscounts(membership.MembershipId).ToList();
             }
 
             return new User(
@@ -139,8 +137,7 @@ namespace TicketManager.Repository
                 reader.IsDBNull(reader.GetOrdinal("phone")) ? null : reader.GetString(reader.GetOrdinal("phone")),
                 reader.GetString(reader.GetOrdinal("username")),
                 reader.GetString(reader.GetOrdinal("password_hash")),
-                membership
-            );
+                membership);
         }
     }
 }

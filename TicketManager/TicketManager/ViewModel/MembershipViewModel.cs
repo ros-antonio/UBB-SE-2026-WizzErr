@@ -1,9 +1,6 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+using System;
 using System.Collections.ObjectModel;
+using System.Windows.Input;
 using TicketManager.Domain;
 using TicketManager.Service;
 
@@ -11,12 +8,19 @@ namespace TicketManager.ViewModel
 {
     public class MembershipDisplayModel
     {
-        public int MembershipId { get; set; }
-        public string Name { get; set; }
-        public string DiscountText { get; set; }
-        public string CardColor { get; set; }
+        private const string BronzeMembershipColor = "#CD7F32";
+        private const string SilverMembershipColor = "#A9A9A9";
+        private const string GoldMembershipColor = "#DAA520";
+        private const string DefaultMembershipColor = "#2bb8c0";
 
-        // NOU: O listă specială pentru UI care va conține textele reducerilor
+        public int MembershipId { get; set; }
+
+        public string Name { get; set; } = string.Empty;
+
+        public string DiscountText { get; set; } = string.Empty;
+
+        public string CardColor { get; set; } = string.Empty;
+
         public ObservableCollection<string> AddonBenefits { get; set; }
 
         public MembershipDisplayModel(Membership m)
@@ -27,13 +31,12 @@ namespace TicketManager.ViewModel
 
             CardColor = Name.ToLower() switch
             {
-                "bronze" => "#CD7F32",
-                "silver" => "#A9A9A9",
-                "gold" => "#DAA520",
-                _ => "#2bb8c0"
+                "bronze" => BronzeMembershipColor,
+                "silver" => SilverMembershipColor,
+                "gold" => GoldMembershipColor,
+                _ => DefaultMembershipColor
             };
 
-            // NOU: Generăm textele dinamic citind din lista adusă de Service
             AddonBenefits = new ObservableCollection<string>();
             if (m.AddonDiscounts != null)
             {
@@ -47,31 +50,76 @@ namespace TicketManager.ViewModel
 
     public class MembershipViewModel : ViewModelBase
     {
-        private readonly IMembershipService _membershipService;
-        public ObservableCollection<MembershipDisplayModel> Memberships { get; set; }
+        private readonly IMembershipService membershipService;
+        private readonly INavigationService navigationService;
 
-        public MembershipViewModel(IMembershipService membershipService)
+        private string purchaseResultMessage = string.Empty;
+
+        private bool? purchaseSucceeded;
+
+        public MembershipViewModel(IMembershipService membershipService, INavigationService navigationService)
         {
-            _membershipService = membershipService;
-            Memberships = new ObservableCollection<MembershipDisplayModel>();
-            LoadMemberships();
+            this.membershipService = membershipService;
+            this.navigationService = navigationService;
+            this.Memberships = new ObservableCollection<MembershipDisplayModel>();
+
+            this.PurchaseCommand = new RelayCommand(parameter => this.ExecutePurchase(parameter));
+
+            this.LoadMemberships();
         }
 
-        private void LoadMemberships()
+        public ObservableCollection<MembershipDisplayModel> Memberships { get; set; }
+
+        public string PurchaseResultMessage
         {
-            var memberships = _membershipService.GetAllMemberships();
-            foreach (var m in memberships)
+            get => this.purchaseResultMessage;
+            set
             {
-                Memberships.Add(new MembershipDisplayModel(m));
+                this.purchaseResultMessage = value;
+                this.OnPropertyChanged();
             }
         }
 
-        public void ExecutePurchase(int membershipId)
+        public bool? PurchaseSucceeded
         {
-            // Verificăm folosind clasa voastră
-            if (UserSession.CurrentUser == null) return;
+            get => this.purchaseSucceeded;
+            set
+            {
+                this.purchaseSucceeded = value;
+                this.OnPropertyChanged();
+            }
+        }
 
-            _membershipService.UpgradeUserMembership(UserSession.CurrentUser.UserId, membershipId);
+        public ICommand PurchaseCommand { get; }
+
+        private void LoadMemberships()
+        {
+            var memberships = this.membershipService.GetAllMemberships();
+            foreach (var m in memberships)
+            {
+                this.Memberships.Add(new MembershipDisplayModel(m));
+            }
+        }
+
+        private void ExecutePurchase(object? parameter)
+        {
+            this.PurchaseSucceeded = null;
+            this.PurchaseResultMessage = string.Empty;
+
+            if (UserSession.CurrentUser == null)
+            {
+                this.navigationService.NavigateTo(typeof(View.AuthPage));
+                return;
+            }
+
+            if (parameter is not int membershipId)
+            {
+                return;
+            }
+
+            var result = this.membershipService.PurchaseMembership(UserSession.CurrentUser.UserId, membershipId);
+            this.PurchaseSucceeded = result.Succeeded;
+            this.PurchaseResultMessage = result.Message;
         }
     }
 }

@@ -3,10 +3,12 @@ namespace TicketManager.Domain
     public class AddOn
     {
         public int AddOnId { get; set; }
-        public string Name { get; set; }
+        public string Name { get; set; } = string.Empty;
         public float BasePrice { get; set; }
 
-        public AddOn() { }
+        public AddOn()
+        {
+        }
 
         public AddOn(string name, float basePrice)
         {
@@ -19,11 +21,6 @@ namespace TicketManager.Domain
             AddOnId = addOnId;
             Name = name;
             BasePrice = basePrice;
-        }
-
-        public float GetBasePrice()
-        {
-            return BasePrice;
         }
     }
 }

@@ -1,90 +1,135 @@
 using System;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
+using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 using System.Windows.Input;
-using System.ComponentModel;
-using System.Runtime.CompilerServices;
-
 using TicketManager.Domain;
 using TicketManager.Service;
 
 namespace TicketManager.ViewModel
 {
-    public class BookingViewModel : INotifyPropertyChanged
+    public class BookingViewModel : ViewModelBase
     {
-        private readonly BookingService _bookingService;
-        private readonly RelayCommand _confirmBookingCommand;
-        private bool _isSaving;
+        private const int DefaultFlightCapacity = 180;
+        private const int SeatsPerRow = 6;
+        private const int AisleAfterColumn = 3;
+        private readonly IBookingService bookingService;
+        private readonly IPricingService pricingService;
+        private readonly INavigationService navigationService;
+        private readonly RelayCommand confirmBookingCommand;
+        private bool isSaving;
+        private bool passengersValid;
 
-        private Flight _currentFlight;
+        private Flight currentFlight = null!;
         public Flight CurrentFlight
         {
-            get => _currentFlight;
-            set { _currentFlight = value; OnPropertyChanged(); }
+            get => currentFlight;
+            set
+            {
+                currentFlight = value;
+                OnPropertyChanged();
+            }
         }
 
-        private User _currentUser;
+        private User currentUser = null!;
         public User CurrentUser
         {
-            get => _currentUser;
-            set { _currentUser = value; OnPropertyChanged(); }
+            get => currentUser;
+            set
+            {
+                currentUser = value;
+                OnPropertyChanged();
+            }
         }
 
-        private ObservableCollection<PassengerFormViewModel> _passengers = new ObservableCollection<PassengerFormViewModel>();
+        private ObservableCollection<PassengerFormViewModel> passengersList = new ObservableCollection<PassengerFormViewModel>();
         public ObservableCollection<PassengerFormViewModel> Passengers
         {
-            get => _passengers;
-            set { _passengers = value; OnPropertyChanged(); }
+            get => passengersList;
+            set
+            {
+                passengersList = value;
+                OnPropertyChanged();
+            }
         }
 
-        private ObservableCollection<AddOn> _availableAddOns = new ObservableCollection<AddOn>();
+        private ObservableCollection<AddOn> availableAddOns = new ObservableCollection<AddOn>();
         public ObservableCollection<AddOn> AvailableAddOns
         {
-            get => _availableAddOns;
-            set { _availableAddOns = value; OnPropertyChanged(); }
+            get => availableAddOns;
+            set
+            {
+                availableAddOns = value;
+                OnPropertyChanged();
+            }
         }
 
-        private ObservableCollection<string> _occupiedSeats = new ObservableCollection<string>();
+        private ObservableCollection<string> occupiedSeats = new ObservableCollection<string>();
         public ObservableCollection<string> OccupiedSeats
         {
-            get => _occupiedSeats;
-            set { _occupiedSeats = value; OnPropertyChanged(); }
+            get => occupiedSeats;
+            set
+            {
+                occupiedSeats = value;
+                OnPropertyChanged();
+            }
         }
 
-        private float _basePriceTotal;
+        private float basePriceTotal;
         public float BasePriceTotal
         {
-            get => _basePriceTotal;
-            set { _basePriceTotal = value; OnPropertyChanged(); }
+            get => basePriceTotal;
+            set
+            {
+                basePriceTotal = value;
+                OnPropertyChanged();
+            }
         }
 
-        private float _basePricePerPerson;
+        private float basePricePerPerson;
         public float BasePricePerPerson
         {
-            get => _basePricePerPerson;
-            set { _basePricePerPerson = value; OnPropertyChanged(); }
+            get => basePricePerPerson;
+            set
+            {
+                basePricePerPerson = value;
+                OnPropertyChanged();
+            }
         }
 
-        private float _finalTotalPrice;
+        private float finalTotalPrice;
         public float FinalTotalPrice
         {
-            get => _finalTotalPrice;
-            set { _finalTotalPrice = value; OnPropertyChanged(); }
+            get => finalTotalPrice;
+            set
+            {
+                finalTotalPrice = value;
+                OnPropertyChanged();
+            }
         }
 
-        private float _addOnsTotal;
+        private float addOnsTotal;
         public float AddOnsTotal
         {
-            get => _addOnsTotal;
-            set { _addOnsTotal = value; OnPropertyChanged(); }
+            get => addOnsTotal;
+            set
+            {
+                addOnsTotal = value;
+                OnPropertyChanged();
+            }
         }
 
-        private float _membershipSavings;
+        private float membershipSavings;
         public float MembershipSavings
         {
-            get => _membershipSavings;
-            set { _membershipSavings = value; OnPropertyChanged(); }
+            get => membershipSavings;
+            set
+            {
+                membershipSavings = value;
+                OnPropertyChanged();
+            }
         }
 
         public string BasePricePerPersonDisplay => $"{BasePricePerPerson:0.00} €";
@@ -93,53 +138,83 @@ namespace TicketManager.ViewModel
         public string MembershipSavingsDisplay => $"-{MembershipSavings:0.00} €";
         public string FinalTotalPriceDisplay => $"{FinalTotalPrice:0.00} €";
 
-        private string _validationMessage;
+        private string validationMessage = string.Empty;
         public string ValidationMessage
         {
-            get => _validationMessage;
-            set { _validationMessage = value; OnPropertyChanged(); }
+            get => validationMessage;
+            set
+            {
+                validationMessage = value;
+                OnPropertyChanged();
+            }
         }
 
-        private int _maxPassengers;
+        private int maxPassengers;
         public int MaxPassengers
         {
-            get => _maxPassengers;
-            set { _maxPassengers = value; OnPropertyChanged(); OnPropertyChanged(nameof(CanAddPassenger)); }
+            get => maxPassengers;
+            set
+            {
+                maxPassengers = value;
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(CanAddPassenger));
+            }
         }
 
         public bool CanAddPassenger => Passengers.Count < MaxPassengers;
         public bool CanRemovePassenger => Passengers.Count > 1;
         public bool CanConfirmBooking =>
-            !_isSaving &&
+            !isSaving &&
             CurrentUser != null &&
             CurrentFlight != null &&
             Passengers.Count > 0 &&
-            Passengers.All(p =>
-                !string.IsNullOrWhiteSpace(p.FirstName) &&
-                !string.IsNullOrWhiteSpace(p.LastName) &&
-                !string.IsNullOrWhiteSpace(p.SelectedSeat) &&
-                IsValidEmail(p.Email));
+            passengersValid;
 
-        public event EventHandler BookingConfirmed;
+        public event EventHandler? BookingConfirmed;
 
-        public BookingViewModel(BookingService bookingService)
+        public BookingViewModel(IBookingService bookingService, IPricingService pricingService, INavigationService navigationService)
         {
-            _bookingService = bookingService;
-            AddPassengerCommand = new RelayCommand(_ => AddPassenger());
-            RemovePassengerCommand = new RelayCommand(param => RemovePassenger(param as PassengerFormViewModel));
-            _confirmBookingCommand = new RelayCommand(async _ => await ConfirmBookingAsync(), _ => CanConfirmBooking);
-            ConfirmBookingCommand = _confirmBookingCommand;
+            this.bookingService = bookingService;
+            this.pricingService = pricingService;
+            this.navigationService = navigationService;
+
+            AddPassengerCommand = new RelayCommand(parameter => AddPassenger());
+            RemovePassengerCommand = new RelayCommand(parameter => RemovePassenger(parameter as PassengerFormViewModel));
+            confirmBookingCommand = new RelayCommand(async parameter => await ConfirmBookingAsync(), parameter => CanConfirmBooking);
+            ConfirmBookingCommand = confirmBookingCommand;
         }
 
         public ICommand AddPassengerCommand { get; }
         public ICommand RemovePassengerCommand { get; }
         public ICommand ConfirmBookingCommand { get; }
 
-        public event PropertyChangedEventHandler PropertyChanged;
+        public List<SeatDescriptor> SeatMapLayout { get; private set; } = new List<SeatDescriptor>();
 
-        protected void OnPropertyChanged([CallerMemberName] string propertyName = null)
+        public int SeatMapRowCount { get; private set; }
+
+        /// <summary>
+        /// Parses the navigation parameter via the service and initializes the booking.
+        /// Previously this method contained 45 lines of if/else parameter parsing;
+        /// that logic now lives in BookingService.ParseBookingParameters.
+        /// </summary>
+        public async Task<bool> OnNavigatedToAsync(object parameter)
         {
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+            var parsed = bookingService.ParseBookingParameters(parameter);
+
+            if (parsed.Flight == null)
+            {
+                return false;
+            }
+
+            if (parsed.User == null)
+            {
+                bookingService.StorePendingBooking(parsed.Flight, parsed.RequestedPassengers);
+                navigationService.NavigateTo(typeof(View.AuthPage));
+                return false;
+            }
+
+            await InitializeAsync(parsed.Flight, parsed.User, parsed.RequestedPassengers);
+            return true;
         }
 
         public async Task InitializeAsync(Flight flight, User user, int requestedPassengerCount = 0)
@@ -147,39 +222,37 @@ namespace TicketManager.ViewModel
             CurrentFlight = flight;
             CurrentUser = user;
 
-            // Load AddOns
-            var addons = await _bookingService.GetAvailableAddOnsAsync();
+            var addons = await bookingService.GetAvailableAddOnsAsync();
             AvailableAddOns.Clear();
             foreach (var addon in addons)
             {
                 AvailableAddOns.Add(addon);
             }
 
-            // Load Occupied Seats
-            var seats = await _bookingService.GetOccupiedSeatsAsync(flight?.FlightId ?? 0);
+            var seats = await bookingService.GetOccupiedSeatsAsync(flight?.FlightId ?? 0);
             OccupiedSeats.Clear();
             foreach (var seat in seats)
             {
                 OccupiedSeats.Add(seat);
             }
 
-            int capacity = flight?.Route?.Capacity ?? 180;
-            int remainingCapacity = capacity - OccupiedSeats.Count;
-
-            int allowedMax = requestedPassengerCount > 0 ? requestedPassengerCount : remainingCapacity;
-            MaxPassengers = allowedMax > remainingCapacity ? remainingCapacity : allowedMax;
+            int capacity = flight?.Route?.Capacity ?? DefaultFlightCapacity;
+            MaxPassengers = bookingService.CalculateMaxPassengers(capacity, OccupiedSeats.Count, requestedPassengerCount);
 
             Passengers.Clear();
             int initialCount = requestedPassengerCount > 0 ? requestedPassengerCount : 1;
-            if (initialCount > MaxPassengers) initialCount = MaxPassengers;
+            if (initialCount > MaxPassengers)
+            {
+                initialCount = MaxPassengers;
+            }
 
-            for(int i = 0; i < initialCount; i++)
+            for (int i = 0; i < initialCount; i++)
             {
                 if (CanAddPassenger || Passengers.Count == 0)
                 {
-                    var p = new PassengerFormViewModel();
-                    RegisterPassenger(p);
-                    Passengers.Add(p);
+                    var passenger = new PassengerFormViewModel();
+                    RegisterPassenger(passenger);
+                    Passengers.Add(passenger);
                 }
             }
 
@@ -188,15 +261,53 @@ namespace TicketManager.ViewModel
             OnPropertyChanged(nameof(CanAddPassenger));
             OnPropertyChanged(nameof(CanRemovePassenger));
             RefreshBookingState();
+            BuildSeatMapLayout();
+        }
+
+        /// <summary>
+        /// Computes the seat map structure: how many rows, and for each seat its
+        /// row index, column index (with aisle gap), and label (e.g. "1A", "3F").
+        /// Previously this computation lived in BookingPage.xaml.cs GenerateSeatMap().
+        /// The View now just reads SeatMapLayout and creates a Button for each entry.
+        /// </summary>
+        public void BuildSeatMapLayout()
+        {
+            var layout = new List<SeatDescriptor>();
+            char[] seatLetters = { 'A', 'B', 'C', 'D', 'E', 'F' };
+            int[] seatColumns = { 0, 1, 2, 4, 5, 6 }; // column 3 is the aisle
+
+            int capacity = CurrentFlight?.Route?.Capacity ?? DefaultFlightCapacity;
+            int rowCount = (capacity + SeatsPerRow - 1) / SeatsPerRow;
+            SeatMapRowCount = rowCount;
+
+            for (int row = 0; row < rowCount; row++)
+            {
+                for (int i = 0; i < SeatsPerRow; i++)
+                {
+                    layout.Add(new SeatDescriptor
+                    {
+                        Row = row,
+                        Column = seatColumns[i],
+                        Label = $"{row + 1}{seatLetters[i]}"
+                    });
+                }
+            }
+
+            SeatMapLayout = layout;
+            OnPropertyChanged(nameof(SeatMapLayout));
+            OnPropertyChanged(nameof(SeatMapRowCount));
         }
 
         private void AddPassenger()
         {
-            if (!CanAddPassenger) return;
+            if (!CanAddPassenger)
+            {
+                return;
+            }
 
-            var p = new PassengerFormViewModel();
-            RegisterPassenger(p);
-            Passengers.Add(p);
+            var passenger = new PassengerFormViewModel();
+            RegisterPassenger(passenger);
+            Passengers.Add(passenger);
             UpdatePassengerLabels();
             UpdatePrices();
             OnPropertyChanged(nameof(CanAddPassenger));
@@ -204,7 +315,7 @@ namespace TicketManager.ViewModel
             RefreshBookingState();
         }
 
-        private void RemovePassenger(PassengerFormViewModel passenger)
+        private void RemovePassenger(PassengerFormViewModel? passenger)
         {
             if (passenger != null && Passengers.Count > 1)
             {
@@ -227,22 +338,35 @@ namespace TicketManager.ViewModel
 
         private void RegisterPassenger(PassengerFormViewModel passenger)
         {
-            passenger.SelectedAddOns.CollectionChanged += (s, e) => UpdatePrices();
-            passenger.PropertyChanged += (s, e) =>
+            passenger.SelectedAddOns.CollectionChanged += (sender, eventArgs) => UpdatePrices();
+            passenger.PropertyChanged += (sender, eventArgs) =>
             {
-                if (e.PropertyName == nameof(passenger.SelectedSeat) ||
-                    e.PropertyName == nameof(passenger.FirstName) ||
-                    e.PropertyName == nameof(passenger.LastName) ||
-                    e.PropertyName == nameof(passenger.Email))
+                if (eventArgs.PropertyName == nameof(passenger.SelectedSeat) ||
+                    eventArgs.PropertyName == nameof(passenger.FirstName) ||
+                    eventArgs.PropertyName == nameof(passenger.LastName) ||
+                    eventArgs.PropertyName == nameof(passenger.Email))
                 {
                     RefreshBookingState();
                 }
 
-                if (e.PropertyName == nameof(passenger.SelectedSeat))
+                if (eventArgs.PropertyName == nameof(passenger.SelectedSeat))
                 {
                     UpdatePrices();
                 }
             };
+        }
+
+        private System.Collections.Generic.List<PassengerData> MapPassengersToData()
+        {
+            return Passengers.Select(passenger => new PassengerData
+            {
+                FirstName = passenger.FirstName,
+                LastName = passenger.LastName,
+                Email = passenger.Email,
+                Phone = passenger.Phone,
+                SelectedSeat = passenger.SelectedSeat,
+                SelectedAddOns = passenger.SelectedAddOns.ToList()
+            }).ToList();
         }
 
         private void RefreshBookingState()
@@ -252,72 +376,36 @@ namespace TicketManager.ViewModel
             if (CurrentUser == null)
             {
                 ValidationMessage = "Please sign in to continue.";
+                passengersValid = false;
             }
             else
             {
-                for (int i = 0; i < Passengers.Count; i++)
-                {
-                    var passenger = Passengers[i];
-                    int passengerNumber = i + 1;
-
-                    if (string.IsNullOrWhiteSpace(passenger.FirstName))
-                    {
-                        ValidationMessage = $"Passenger {passengerNumber}: first name is required.";
-                        break;
-                    }
-
-                    if (string.IsNullOrWhiteSpace(passenger.LastName))
-                    {
-                        ValidationMessage = $"Passenger {passengerNumber}: last name is required.";
-                        break;
-                    }
-
-                    if (!IsValidEmail(passenger.Email))
-                    {
-                        ValidationMessage = $"Passenger {passengerNumber}: email format is invalid.";
-                        break;
-                    }
-
-                    if (string.IsNullOrWhiteSpace(passenger.SelectedSeat))
-                    {
-                        ValidationMessage = $"Passenger {passengerNumber}: please select a seat.";
-                        break;
-                    }
-                }
+                var passengerData = MapPassengersToData();
+                ValidationMessage = bookingService.ValidatePassengers(passengerData);
+                passengersValid = string.IsNullOrEmpty(ValidationMessage);
             }
 
             OnPropertyChanged(nameof(CanConfirmBooking));
-            _confirmBookingCommand.RaiseCanExecuteChanged();
-        }
-
-        private static bool IsValidEmail(string email)
-        {
-            if (string.IsNullOrWhiteSpace(email))
-            {
-                return true;
-            }
-
-            int atIndex = email.IndexOf('@');
-            int dotIndex = email.LastIndexOf('.');
-            return atIndex > 0 && dotIndex > atIndex + 1 && dotIndex < email.Length - 1;
+            confirmBookingCommand.RaiseCanExecuteChanged();
         }
 
         public void UpdatePrices()
         {
-            if (CurrentFlight == null) return;
+            if (CurrentFlight == null)
+            {
+                return;
+            }
 
-            float basePrice = CurrentFlight.GetBasePrice();
-            BasePricePerPerson = basePrice;
+            float basePrice = pricingService.CalculateBasePrice(CurrentFlight);
+            var passengerData = MapPassengersToData();
+            var tickets = bookingService.CreateTickets(CurrentFlight, CurrentUser, passengerData, basePrice);
+            var breakdown = pricingService.CalculatePriceBreakdown(CurrentFlight, CurrentUser, tickets);
 
-            BasePriceTotal = basePrice * Passengers.Count;
-
-            var tickets = _bookingService.CreateTickets(CurrentFlight, CurrentUser, Passengers.ToList(), basePrice);
-
-            float addOnsWithoutMembership = tickets.Sum(t => t.SelectedAddOns.Sum(a => a.GetBasePrice()));
-            float totalWithoutMembership = BasePriceTotal + addOnsWithoutMembership;
-            FinalTotalPrice = _bookingService.CalculateFinalPrice(tickets, CurrentUser);
-            AddOnsTotal = addOnsWithoutMembership;
-            MembershipSavings = Math.Max(0, totalWithoutMembership - FinalTotalPrice);
+            BasePricePerPerson = breakdown.BasePricePerPerson;
+            BasePriceTotal = breakdown.BasePriceTotal;
+            AddOnsTotal = breakdown.AddOnsTotal;
+            MembershipSavings = breakdown.MembershipSavings;
+            FinalTotalPrice = breakdown.FinalTotal;
 
             OnPropertyChanged(nameof(BasePricePerPersonDisplay));
             OnPropertyChanged(nameof(BasePriceTotalDisplay));
@@ -330,26 +418,68 @@ namespace TicketManager.ViewModel
 
         private async Task ConfirmBookingAsync()
         {
-            if (!CanConfirmBooking) return;
+            if (!CanConfirmBooking)
+            {
+                return;
+            }
 
-            float basePrice = CurrentFlight.GetBasePrice();
-            var tickets = _bookingService.CreateTickets(CurrentFlight, CurrentUser, Passengers.ToList(), basePrice);
+            float basePrice = pricingService.CalculateBasePrice(CurrentFlight);
+            var passengerData = MapPassengersToData();
+            var tickets = bookingService.CreateTickets(CurrentFlight, CurrentUser, passengerData, basePrice);
+            foreach (var ticket in tickets)
+            {
+                ticket.Price = pricingService.CalculateTotalPrice(ticket);
+            }
 
-            _isSaving = true;
+            isSaving = true;
             OnPropertyChanged(nameof(CanConfirmBooking));
-            _confirmBookingCommand.RaiseCanExecuteChanged();
+            confirmBookingCommand.RaiseCanExecuteChanged();
 
-            bool success = await _bookingService.SaveTicketsAsync(tickets);
+            bool success = await bookingService.SaveTicketsAsync(tickets);
 
-            _isSaving = false;
+            isSaving = false;
             OnPropertyChanged(nameof(CanConfirmBooking));
-            _confirmBookingCommand.RaiseCanExecuteChanged();
+            confirmBookingCommand.RaiseCanExecuteChanged();
 
             ValidationMessage = success ? "Booking confirmed successfully." : "Booking could not be saved. Please try again.";
 
             if (success)
             {
                 BookingConfirmed?.Invoke(this, EventArgs.Empty);
+            }
+        }
+
+        public void SelectSeat(PassengerFormViewModel targetPassenger, string seat)
+        {
+            var currentHolder = Passengers.FirstOrDefault(passenger => passenger.SelectedSeat == seat);
+            if (currentHolder == targetPassenger)
+            {
+                targetPassenger.SelectedSeat = string.Empty;
+            }
+            else
+            {
+                if (currentHolder != null)
+                {
+                    currentHolder.SelectedSeat = string.Empty;
+                }
+
+                targetPassenger.SelectedSeat = seat;
+            }
+        }
+
+        public void UpdatePassengerAddOns(PassengerFormViewModel passenger, IEnumerable<AddOn> addedAddOns, IEnumerable<AddOn> removedAddOns)
+        {
+            foreach (var addOn in addedAddOns)
+            {
+                if (!passenger.SelectedAddOns.Contains(addOn))
+                {
+                    passenger.SelectedAddOns.Add(addOn);
+                }
+            }
+
+            foreach (var addOn in removedAddOns)
+            {
+                passenger.SelectedAddOns.Remove(addOn);
             }
         }
     }

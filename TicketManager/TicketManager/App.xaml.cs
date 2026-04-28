@@ -1,50 +1,70 @@
-﻿using Microsoft.UI.Xaml;
-using Microsoft.UI.Xaml.Controls;
-using Microsoft.UI.Xaml.Controls.Primitives;
-using Microsoft.UI.Xaml.Data;
-using Microsoft.UI.Xaml.Input;
-using Microsoft.UI.Xaml.Media;
-using Microsoft.UI.Xaml.Navigation;
-using Microsoft.UI.Xaml.Shapes;
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
-using System.Runtime.InteropServices.WindowsRuntime;
-using Windows.ApplicationModel;
-using Windows.ApplicationModel.Activation;
-using Windows.Foundation;
-using Windows.Foundation.Collections;
-
-// To learn more about WinUI, the WinUI project structure,
-// and more about our project templates, see: http://aka.ms/winui-project-info.
+using Microsoft.UI.Xaml;
+using TicketManager.Repository;
+using TicketManager.Service;
 
 namespace TicketManager
 {
     /// <summary>
     /// Provides application-specific behavior to supplement the default Application class.
+    /// Also serves as the Composition Root: the single place where all concrete
+    /// dependencies are wired together. Views retrieve what they need from here
+    /// instead of constructing dependency chains themselves.
     /// </summary>
     public partial class App : Application
     {
-        private Window? _window;
+        private Window window = null!;
 
-        /// <summary>
-        /// Initializes the singleton application object.  This is the first line of authored code
-        /// executed, and as such is the logical equivalent of main() or WinMain().
-        /// </summary>
+        private static IDatabaseConnectionFactory databaseConnectionFactory = null!;
+
+        private static IFlightRepository flightRepository = null!;
+        private static ITicketRepository ticketRepository = null!;
+        private static IAddOnRepository addOnRepository = null!;
+        private static IMembershipRepository membershipRepository = null!;
+        private static IUserRepository userRepository = null!;
+
+        public static IAuthService AuthService { get; private set; } = null!;
+        public static IFlightSearchService FlightSearchService { get; private set; } = null!;
+        public static IBookingService BookingService { get; private set; } = null!;
+        public static IPricingService PricingService { get; private set; } = null!;
+        public static IDashboardService DashboardService { get; private set; } = null!;
+        public static ICancellationService CancellationService { get; private set; } = null!;
+        public static IMembershipService MembershipService { get; private set; } = null!;
+        public static NavigationService NavigationService { get; private set; } = null!;
+
         public App()
         {
             InitializeComponent();
+            ConfigureServices();
+        }
+
+        protected override void OnLaunched(LaunchActivatedEventArgs eventArgs)
+        {
+            window = new MainWindow();
+            window.Activate();
         }
 
         /// <summary>
-        /// Invoked when the application is launched.
+        /// Wires up every concrete dependency once. Views and ViewModels never
+        /// need to know about DatabaseConnectionFactory or concrete repository types.
         /// </summary>
-        /// <param name="args">Details about the launch request and process.</param>
-        protected override void OnLaunched(Microsoft.UI.Xaml.LaunchActivatedEventArgs args)
+        private static void ConfigureServices()
         {
-            _window = new MainWindow();
-            _window.Activate();
+            databaseConnectionFactory = new DatabaseConnectionFactory();
+
+            flightRepository = new FlightRepository(databaseConnectionFactory);
+            ticketRepository = new TicketRepository(databaseConnectionFactory);
+            addOnRepository = new AddOnRepository(databaseConnectionFactory);
+            membershipRepository = new MembershipRepository(databaseConnectionFactory);
+            userRepository = new UserRepository(databaseConnectionFactory, membershipRepository);
+
+            AuthService = new AuthService(userRepository);
+            FlightSearchService = new FlightSearchService(flightRepository);
+            BookingService = new BookingService(ticketRepository, addOnRepository);
+            PricingService = new PricingService();
+            DashboardService = new DashboardService(ticketRepository);
+            CancellationService = new CancellationService(ticketRepository);
+            MembershipService = new MembershipService(userRepository, membershipRepository);
+            NavigationService = new NavigationService();
         }
     }
 }

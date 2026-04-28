@@ -1,168 +1,60 @@
-using Microsoft.UI.Xaml;
-using Microsoft.UI.Xaml.Controls;
 using System;
-using TicketManager.Repository;
-using TicketManager.Service;
+using System.ComponentModel;
+using Microsoft.UI.Xaml.Controls;
 using TicketManager.ViewModel;
 
 namespace TicketManager.View
 {
     public sealed partial class AuthPage : Page
     {
-        private readonly AuthViewModel _viewModel;
+        public AuthViewModel ViewModel { get; }
 
         public AuthPage()
         {
             this.InitializeComponent();
 
-            var dbFactory = new DatabaseConnectionFactory();
-            var userRepository = new UserRepository(dbFactory);
-            var authService = new AuthService(userRepository);
-            _viewModel = new AuthViewModel(authService);
+            ViewModel = new AuthViewModel(App.AuthService, App.NavigationService);
+            this.DataContext = ViewModel;
 
-            this.DataContext = _viewModel;
+            ViewModel.PropertyChanged += ViewModel_PropertyChanged;
         }
 
-        private void ActionButton_Click(object sender, RoutedEventArgs e)
+        private async void ViewModel_PropertyChanged(object? sender, PropertyChangedEventArgs eventArgs)
         {
-            _viewModel.PasswordText = passwordInput.Password;
-
-            if (_viewModel.IsLoginMode)
+            if (eventArgs.PropertyName == nameof(ViewModel.ErrorMessage) &&
+                !string.IsNullOrWhiteSpace(ViewModel.ErrorMessage))
             {
-                _viewModel.Login();
-
-                if (_viewModel.IsAuthenticated)
-                {
-                    UserSession.CurrentUser = _viewModel.AuthenticatedUser;
-
-                    if (UserSession.PendingBookingParameters != null)
-                    {
-                        var pendingParameters = UserSession.PendingBookingParameters;
-                        UserSession.PendingBookingParameters = null;
-                        this.Frame.Navigate(typeof(BookingPage), pendingParameters);
-                    }
-                    else
-                    {
-                        this.Frame.Navigate(typeof(FlightSearchPage));
-                    }
-                }
-            }
-            else
-            {
-                _viewModel.Register();
-
-                if (string.IsNullOrWhiteSpace(_viewModel.ErrorMessage))
-                {
-                    _viewModel.IsLoginMode = true;
-
-                    TitleTextBlock.Text = "Welcome to WizzErr";
-                    SubtitleTextBlock.Text = "Please sign in to manage your tickets";
-                    loginButton.Content = "Sign In";
-                    TogglePromptText.Text = "Don't have an account?";
-                    ToggleModeButton.Content = "Create one";
-                    usernameInput.Visibility = Visibility.Collapsed;
-                    phoneInput.Visibility = Visibility.Collapsed;
-                }
-            }
-
-            ShowMessages();
-        }
-
-        private void ToggleMode_Click(object sender, RoutedEventArgs e)
-        {
-            _viewModel.IsLoginMode = !_viewModel.IsLoginMode;
-
-            if (_viewModel.IsLoginMode)
-            {
-                TitleTextBlock.Text = "Welcome to WizzErr";
-                SubtitleTextBlock.Text = "Please sign in to manage your tickets";
-                loginButton.Content = "Sign In";
-                TogglePromptText.Text = "Don't have an account?";
-                ToggleModeButton.Content = "Create one";
-                usernameInput.Visibility = Visibility.Collapsed;
-                phoneInput.Visibility = Visibility.Collapsed;
-            }
-            else
-            {
-                TitleTextBlock.Text = "Create a WizzErr Account";
-                SubtitleTextBlock.Text = "Fill in the details to register";
-                loginButton.Content = "Register";
-                TogglePromptText.Text = "Already have an account?";
-                ToggleModeButton.Content = "Sign in";
-                usernameInput.Visibility = Visibility.Visible;
-                phoneInput.Visibility = Visibility.Visible;
-            }
-
-            _viewModel.ClearMessages();
-            ShowMessages();
-            ValidateInput();
-        }
-
-        private void Input_TextChanged(object sender, TextChangedEventArgs e)
-        {
-            SyncInputsToViewModel();
-            ValidateInput();
-        }
-
-        private void Password_PasswordChanged(object sender, RoutedEventArgs e)
-        {
-            _viewModel.PasswordText = passwordInput.Password;
-            ValidateInput();
-        }
-
-        private void SyncInputsToViewModel()
-        {
-            _viewModel.EmailText = emailInput.Text;
-            _viewModel.UsernameText = usernameInput.Text;
-            _viewModel.PhoneText = phoneInput.Text;
-        }
-
-        private void ValidateInput()
-        {
-            if (loginButton == null) return;
-
-            if (_viewModel.IsLoginMode)
-            {
-                loginButton.IsEnabled =
-                    !string.IsNullOrWhiteSpace(emailInput.Text) &&
-                    !string.IsNullOrWhiteSpace(passwordInput.Password);
-            }
-            else
-            {
-                loginButton.IsEnabled =
-                    !string.IsNullOrWhiteSpace(emailInput.Text) &&
-                    !string.IsNullOrWhiteSpace(usernameInput.Text) &&
-                    !string.IsNullOrWhiteSpace(phoneInput.Text) &&
-                    !string.IsNullOrWhiteSpace(passwordInput.Password);
-            }
-        }
-
-        private async void ShowMessages()
-        {
-            if (!string.IsNullOrWhiteSpace(_viewModel.ErrorMessage))
-            {
-                ContentDialog dialog = new ContentDialog
+                var dialog = new ContentDialog
                 {
                     Title = "Error",
-                    Content = _viewModel.ErrorMessage,
+                    Content = ViewModel.ErrorMessage,
                     CloseButtonText = "OK",
                     XamlRoot = this.XamlRoot
                 };
-
                 await dialog.ShowAsync();
             }
-            else if (!string.IsNullOrWhiteSpace(_viewModel.SuccessMessage) && !_viewModel.IsAuthenticated)
+            else if (eventArgs.PropertyName == nameof(ViewModel.SuccessMessage) &&
+                     !string.IsNullOrWhiteSpace(ViewModel.SuccessMessage) &&
+                     !ViewModel.IsAuthenticated)
             {
-                ContentDialog dialog = new ContentDialog
+                var dialog = new ContentDialog
                 {
                     Title = "Success",
-                    Content = _viewModel.SuccessMessage,
+                    Content = ViewModel.SuccessMessage,
                     CloseButtonText = "OK",
                     XamlRoot = this.XamlRoot
                 };
-
                 await dialog.ShowAsync();
             }
+        }
+
+        private void Password_PasswordChanged(object? sender, Microsoft.UI.Xaml.RoutedEventArgs eventArgs)
+        {
+            ViewModel.PasswordText = passwordInput.Password;
         }
     }
 }
+
+
+
+

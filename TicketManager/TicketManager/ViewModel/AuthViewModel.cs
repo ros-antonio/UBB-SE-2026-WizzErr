@@ -1,137 +1,295 @@
-﻿using System;
-using System.ComponentModel;
-using System.Runtime.CompilerServices;
+using System;
 using System.Windows.Input;
 using TicketManager.Domain;
 using TicketManager.Service;
 
 namespace TicketManager.ViewModel
 {
-    public class AuthViewModel : INotifyPropertyChanged
+    public class AuthViewModel : ViewModelBase
     {
-        private readonly AuthService _authService;
+        private readonly IAuthService authService;
+        private readonly INavigationService navigationService;
 
-        private string _emailText;
-        private string _passwordText;
-        private string _usernameText;
-        private string _phoneText;
-        private string _errorMessage;
-        private string _successMessage;
-        private bool _isLoginMode = true;
-        private bool _isAuthenticated;
-        private User _authenticatedUser;
+        private string emailText = string.Empty;
+        private string passwordText = string.Empty;
+        private string usernameText = string.Empty;
+        private string phoneText = string.Empty;
+        private string errorMessage = string.Empty;
+        private string successMessage = string.Empty;
+        private bool isLoginMode = true;
+        private bool isAuthenticated;
+        private User? authenticatedUser;
 
-        public event PropertyChangedEventHandler PropertyChanged;
+        private string titleText = "Welcome to WizzErr";
+        private string subtitleText = "Please sign in to manage your tickets";
+        private string actionButtonLabel = "Sign In";
+        private string togglePromptLabel = "Don't have an account?";
+        private string toggleButtonLabel = "Create one";
+        private bool isRegisterFieldsVisible = false;
 
-        public AuthViewModel(AuthService authService)
+        public AuthViewModel(IAuthService authService, INavigationService navigationService)
         {
-            _authService = authService ?? throw new ArgumentNullException(nameof(authService));
+            this.authService = authService ?? throw new ArgumentNullException(nameof(authService));
+            this.navigationService = navigationService ?? throw new ArgumentNullException(nameof(navigationService));
 
-            LoginCommand = new RelayCommand(_ => Login());
-            RegisterCommand = new RelayCommand(_ => Register());
+            ActionCommand = new RelayCommand(parameter => ExecuteAction(), parameter => IsFormValid);
+            ToggleModeCommand = new RelayCommand(parameter => ToggleMode());
         }
 
         public string EmailText
         {
-            get => _emailText;
+            get => emailText;
             set
             {
-                _emailText = value;
+                emailText = value;
                 OnPropertyChanged();
+                RaiseActionCanExecuteChanged();
             }
         }
 
         public string PasswordText
         {
-            get => _passwordText;
+            get => passwordText;
             set
             {
-                _passwordText = value;
+                passwordText = value;
                 OnPropertyChanged();
+                RaiseActionCanExecuteChanged();
             }
         }
 
         public string UsernameText
         {
-            get => _usernameText;
+            get => usernameText;
             set
             {
-                _usernameText = value;
+                usernameText = value;
                 OnPropertyChanged();
+                RaiseActionCanExecuteChanged();
             }
         }
 
         public string PhoneText
         {
-            get => _phoneText;
+            get => phoneText;
             set
             {
-                _phoneText = value;
+                phoneText = value;
                 OnPropertyChanged();
+                RaiseActionCanExecuteChanged();
             }
         }
 
         public string ErrorMessage
         {
-            get => _errorMessage;
+            get => errorMessage;
             set
             {
-                _errorMessage = value;
+                errorMessage = value;
                 OnPropertyChanged();
             }
         }
 
         public string SuccessMessage
         {
-            get => _successMessage;
+            get => successMessage;
             set
             {
-                _successMessage = value;
+                successMessage = value;
                 OnPropertyChanged();
             }
         }
 
         public bool IsLoginMode
         {
-            get => _isLoginMode;
+            get => isLoginMode;
             set
             {
-                _isLoginMode = value;
+                isLoginMode = value;
                 OnPropertyChanged();
             }
         }
 
         public bool IsAuthenticated
         {
-            get => _isAuthenticated;
+            get => isAuthenticated;
             set
             {
-                _isAuthenticated = value;
+                isAuthenticated = value;
                 OnPropertyChanged();
             }
         }
 
-        public User AuthenticatedUser
+        public User? AuthenticatedUser
         {
-            get => _authenticatedUser;
+            get => authenticatedUser;
             set
             {
-                _authenticatedUser = value;
+                authenticatedUser = value;
                 OnPropertyChanged();
             }
         }
 
-        public ICommand LoginCommand { get; }
-        public ICommand RegisterCommand { get; }
+        public string TitleText
+        {
+            get => titleText;
+            set
+            {
+                titleText = value;
+                OnPropertyChanged();
+            }
+        }
 
-        public void Login()
+        public string SubtitleText
+        {
+            get => subtitleText;
+            set
+            {
+                subtitleText = value;
+                OnPropertyChanged();
+            }
+        }
+
+        public string ActionButtonLabel
+        {
+            get => actionButtonLabel;
+            set
+            {
+                actionButtonLabel = value;
+                OnPropertyChanged();
+            }
+        }
+
+        public string TogglePromptLabel
+        {
+            get => togglePromptLabel;
+            set
+            {
+                togglePromptLabel = value;
+                OnPropertyChanged();
+            }
+        }
+
+        public string ToggleButtonLabel
+        {
+            get => toggleButtonLabel;
+            set
+            {
+                toggleButtonLabel = value;
+                OnPropertyChanged();
+            }
+        }
+
+        public bool IsRegisterFieldsVisible
+        {
+            get => isRegisterFieldsVisible;
+            set
+            {
+                isRegisterFieldsVisible = value;
+                OnPropertyChanged();
+            }
+        }
+
+        public bool IsFormValid
+        {
+            get
+            {
+                if (IsLoginMode)
+                {
+                    return !string.IsNullOrWhiteSpace(EmailText) &&
+                           !string.IsNullOrWhiteSpace(PasswordText);
+                }
+                else
+                {
+                    return !string.IsNullOrWhiteSpace(EmailText) &&
+                           !string.IsNullOrWhiteSpace(UsernameText) &&
+                           !string.IsNullOrWhiteSpace(PhoneText) &&
+                           !string.IsNullOrWhiteSpace(PasswordText);
+                }
+            }
+        }
+
+        public ICommand ActionCommand { get; }
+        public ICommand ToggleModeCommand { get; }
+
+        private void ExecuteAction()
+        {
+            if (IsLoginMode)
+            {
+                Login();
+
+                if (IsAuthenticated)
+                {
+                    UserSession.CurrentUser = AuthenticatedUser;
+
+                    if (UserSession.PendingBookingParameters != null)
+                    {
+                        var pendingParameters = UserSession.PendingBookingParameters;
+                        UserSession.PendingBookingParameters = null;
+                        navigationService.NavigateTo(typeof(View.BookingPage), pendingParameters);
+                    }
+                    else
+                    {
+                        navigationService.NavigateTo(typeof(View.FlightSearchPage));
+                    }
+                }
+            }
+            else
+            {
+                Register();
+
+                if (string.IsNullOrWhiteSpace(ErrorMessage))
+                {
+                    SetLoginMode();
+                }
+            }
+        }
+
+        private void ToggleMode()
+        {
+            if (IsLoginMode)
+            {
+                SetRegisterMode();
+            }
+            else
+            {
+                SetLoginMode();
+            }
+
+            ClearMessages();
+            RaiseActionCanExecuteChanged();
+        }
+
+        private void SetLoginMode()
+        {
+            IsLoginMode = true;
+            TitleText = "Welcome to WizzErr";
+            SubtitleText = "Please sign in to manage your tickets";
+            ActionButtonLabel = "Sign In";
+            TogglePromptLabel = "Don't have an account?";
+            ToggleButtonLabel = "Create one";
+            IsRegisterFieldsVisible = false;
+        }
+
+        private void SetRegisterMode()
+        {
+            IsLoginMode = false;
+            TitleText = "Create a WizzErr Account";
+            SubtitleText = "Fill in the details to register";
+            ActionButtonLabel = "Register";
+            TogglePromptLabel = "Already have an account?";
+            ToggleButtonLabel = "Sign in";
+            IsRegisterFieldsVisible = true;
+        }
+
+        private void Login()
         {
             try
             {
                 ErrorMessage = string.Empty;
                 SuccessMessage = string.Empty;
 
-                User user = _authService.Login(EmailText, PasswordText);
+                User user = authService.Login(EmailText, PasswordText);
 
                 AuthenticatedUser = user;
                 IsAuthenticated = true;
@@ -145,14 +303,14 @@ namespace TicketManager.ViewModel
             }
         }
 
-        public void Register()
+        private void Register()
         {
             try
             {
                 ErrorMessage = string.Empty;
                 SuccessMessage = string.Empty;
 
-                _authService.Register(EmailText, PhoneText, UsernameText, PasswordText);
+                authService.Register(EmailText, PhoneText, UsernameText, PasswordText);
 
                 SuccessMessage = "Registration successful. You can now sign in.";
             }
@@ -168,10 +326,10 @@ namespace TicketManager.ViewModel
             SuccessMessage = string.Empty;
         }
 
-        private void OnPropertyChanged([CallerMemberName] string propertyName = null)
+        private void RaiseActionCanExecuteChanged()
         {
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+            OnPropertyChanged(nameof(IsFormValid));
+            (ActionCommand as RelayCommand)?.RaiseCanExecuteChanged();
         }
     }
 }
-

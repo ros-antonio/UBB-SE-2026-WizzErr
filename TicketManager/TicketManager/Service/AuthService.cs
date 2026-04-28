@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Linq;
 using System.Net.Mail;
 using Microsoft.AspNetCore.Identity;
@@ -7,111 +7,131 @@ using TicketManager.Repository;
 
 namespace TicketManager.Service
 {
-    public class AuthService
+    public class AuthService : IAuthService
     {
-        private readonly IUserRepository _userRepo;
-        private readonly PasswordHasher<User> _passwordHasher;
+        private const int MinimumUsernameLength = 3;
+        private const int MinimumPasswordLength = 6;
 
-        public AuthService(IUserRepository userRepo)
+        private readonly IUserRepository userRepository;
+        private readonly PasswordHasher<User> passwordHasher;
+
+        public AuthService(IUserRepository userRepository)
         {
-            _userRepo = userRepo ?? throw new ArgumentNullException(nameof(userRepo));
-            _passwordHasher = new PasswordHasher<User>();
+            this.userRepository = userRepository ?? throw new ArgumentNullException(nameof(userRepository));
+            this.passwordHasher = new PasswordHasher<User>();
         }
 
         public User Login(string email, string password)
         {
             if (string.IsNullOrWhiteSpace(email))
+            {
                 throw new ArgumentException("Email is required.");
+            }
 
             if (string.IsNullOrWhiteSpace(password))
+            {
                 throw new ArgumentException("Password is required.");
+            }
 
-            User existingUser = _userRepo.GetByEmail(email.Trim());
+            User? existingUser = this.userRepository.GetByEmail(email.Trim());
 
             if (existingUser == null)
+            {
                 throw new InvalidOperationException("No account found with this email.");
+            }
 
-            PasswordVerificationResult result =
-                _passwordHasher.VerifyHashedPassword(existingUser, existingUser.PasswordHash, password);
+            PasswordVerificationResult passwordVerificationResult =
+                this.passwordHasher.VerifyHashedPassword(existingUser, existingUser.PasswordHash, password);
 
-            if (result == PasswordVerificationResult.Failed)
+            if (passwordVerificationResult == PasswordVerificationResult.Failed)
+            {
                 throw new InvalidOperationException("Invalid email or password.");
+            }
 
             return existingUser;
         }
 
         public void Register(string email, string phone, string username, string password)
         {
-            string normalizedEmail = email?.Trim();
-            string normalizedUsername = username?.Trim();
-            string normalizedPhone = phone?.Trim();
+            string? normalizedEmail = email?.Trim();
+            string? normalizedUsername = username?.Trim();
+            string? normalizedPhone = phone?.Trim();
 
-            ValidateRegistrationData(normalizedEmail, normalizedPhone, normalizedUsername, password);
+            this.ValidateRegistrationData(normalizedEmail, normalizedPhone, normalizedUsername, password);
 
-            User existingUser = _userRepo.GetByEmail(normalizedEmail);
+            User? existingUser = this.userRepository.GetByEmail(normalizedEmail!);
             if (existingUser != null)
+            {
                 throw new InvalidOperationException("An account with this email already exists.");
+            }
 
             User newUser = new User
             {
-                Email = normalizedEmail,
+                Email = normalizedEmail!,
                 Phone = normalizedPhone,
-                Username = normalizedUsername,
+                Username = normalizedUsername!,
                 Membership = null
             };
 
-            string hashedPassword = _passwordHasher.HashPassword(newUser, password);
+            string hashedPassword = this.passwordHasher.HashPassword(newUser, password);
             newUser.PasswordHash = hashedPassword;
 
-            _userRepo.AddUser(newUser);
+            this.userRepository.AddUser(newUser);
         }
 
-        private void ValidateRegistrationData(string email, string phone, string username, string password)
+        public void Logout()
+        {
+            UserSession.CurrentUser = null;
+            UserSession.PendingBookingParameters = null;
+        }
+
+        private void ValidateRegistrationData(string? email, string? phone, string? username, string password)
         {
             if (string.IsNullOrWhiteSpace(email))
+            {
                 throw new ArgumentException("Email is required.");
+            }
 
-            if (!IsValidEmail(email))
+            if (!ValidationHelper.IsValidEmail(email))
+            {
                 throw new ArgumentException("Email format is invalid.");
+            }
 
             if (string.IsNullOrWhiteSpace(username))
+            {
                 throw new ArgumentException("Username is required.");
+            }
 
-            if (username.Length < 3)
+            if (username.Length < MinimumUsernameLength)
+            {
                 throw new ArgumentException("Username must have at least 3 characters.");
+            }
 
-            if (!username.All(c => char.IsLetter(c) || char.IsDigit(c) || c == '_' || c == ' '))
+            if (!username.All(character => char.IsLetter(character) || char.IsDigit(character) || character == '_' || character == ' '))
+            {
                 throw new ArgumentException("Username contains invalid characters.");
+            }
 
             if (string.IsNullOrWhiteSpace(phone))
+            {
                 throw new ArgumentException("Phone is required.");
+            }
 
-            if (!IsValidPhone(phone))
+            if (!ValidationHelper.IsValidPhone(phone))
+            {
                 throw new ArgumentException("Phone number must contain only digits and have 10 to 15 digits.");
+            }
 
             if (string.IsNullOrWhiteSpace(password))
+            {
                 throw new ArgumentException("Password is required.");
+            }
 
-            if (password.Length < 6)
+            if (password.Length < MinimumPasswordLength)
+            {
                 throw new ArgumentException("Password must be at least 6 characters long.");
-        }
-
-        private bool IsValidEmail(string email)
-        {
-            try
-            {
-                var mail = new MailAddress(email);
-                return mail.Address == email;
             }
-            catch
-            {
-                return false;
-            }
-        }
-
-        private bool IsValidPhone(string phone)
-        {
-            return phone.All(char.IsDigit) && phone.Length >= 10 && phone.Length <= 15;
         }
     }
 }
+
